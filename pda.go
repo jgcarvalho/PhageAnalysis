@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/jgcarvalho/PhageAnalysis/pep"
+
 	"code.google.com/p/biogo/align"
 	"code.google.com/p/biogo/alphabet"
 	"code.google.com/p/biogo/io/seqio"
@@ -33,40 +35,45 @@ var codon = map[string]string{
 	"GGA": "G", "GGT": "G", "GGC": "G", "GGG": "G",
 }
 
-func RevComp(s string) string {
-	runes := []rune(s)
-	for i, v := range runes {
-		if v == 'C' {
-			runes[i] = 'G'
-		} else if v == 'G' {
-			runes[i] = 'C'
-		} else if v == 'A' {
-			runes[i] = 'T'
-		} else if v == 'T' {
-			runes[i] = 'A'
-		}
-	}
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
+var sw = align.FittedAffine{
+	Matrix: [][]int{
+		{0, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50},
+		{-50, 50, -50, -50, -4, 1, -4, -1, -4, 1, -4, -1, -4, -1, -4, 0},
+		{-50, -50, 50, -50, -50, -4, 1, -1, -4, -4, 1, -1, -4, -4, -1, 0},
+		{-50, -50, -50, 50, -50, -2, -2, -1, -4, -2, -2, -1, -4, -3, -3, 0},
+		{-50, -50, -50, -50, 50, 1, 1, -1, -4, -4, -4, -4, 1, -1, -1, 0},
+		{-50, 1, -4, -2, 1, -1, -2, -1, -4, -2, -4, -3, -2, -1, -3, 0},
+		{-50, -4, 1, -2, 1, -2, -1, -1, -4, -4, -2, -3, -2, -3, -1, 0},
+		{-50, -1, -1, -1, -1, -1, -1, -1, -4, -3, -3, -2, -3, -2, -2, 0},
+		{-50, -4, -4, -4, -4, -4, -4, -4, 5, 1, 1, -1, 1, -1, -1, 0},
+		{-50, 1, -4, -2, -4, -2, -4, -3, 1, -1, -2, -1, -2, -1, -3, 0},
+		{-50, -4, 1, -2, -4, -4, -2, -3, 1, -2, -1, -1, -2, -3, -1, 0},
+		{-50, -1, -1, -1, -4, -3, -3, -2, -1, -1, -1, -1, -3, -2, -2, 0},
+		{-50, -4, -4, -4, 1, -2, -2, -3, 1, -2, -2, -3, -1, -1, -1, 0},
+		{-50, -1, -4, -3, -1, -1, -3, -2, -1, -1, -3, -2, -1, -1, -2, 0},
+		{-50, -4, -1, -3, -1, -3, -1, -2, -1, -3, -1, -2, -1, -2, -1, 0},
+		{-50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	},
+	GapOpen: 0,
 }
 
-func Translate(in alphabet.Slice) {
+func translate(in alphabet.Slice) (*linear.Seq, bool) {
 	s := fmt.Sprintf("%s", in)
-	fmt.Println(s)
-	s = RevComp(s)
-	fmt.Println(s)
-	for i := len(s); i > 0; i -= 3 {
-		fmt.Printf(" %s ", codon[s[i-3:i]])
-		// if s[i:i+3] == "ACT" {
-		// 	fmt.Printf(codon)
-		// }
+	ok := true
+	// fmt.Println(s)
+	var p string
+	for i := 0; i < len(s); i += 3 {
+		// test NNK codons
+		if s[i+2] != 'T' && s[i+2] != 'G' {
+			ok = false
+		}
+		p += codon[s[i:i+3]]
 	}
-	fmt.Println()
+	pep := linear.NewSeq("pep", alphabet.BytesToLetters([]byte(p)), alphabet.Protein)
+	return pep, ok
 }
 
-func ReadMFastQ(fn string) ([]seq.Sequence, error) {
+func readMFastQ(fn string) ([]seq.Sequence, error) {
 	fasta, err := os.Open(fn)
 	if err != nil {
 		fmt.Println("Erro ao ler o arquivo", err)
@@ -79,87 +86,86 @@ func ReadMFastQ(fn string) ([]seq.Sequence, error) {
 	scanner := seqio.NewScanner(reader)
 	for scanner.Next() {
 		s := scanner.Seq()
-		//fmt.Println(s)
 		sequence = append(sequence, s)
 	}
-	// for i, seq := reader.Read(){
-	//     fmt.Println(i, seq)
-	// }
-	//fmt.Println("Read -> ", seq.Alphabet())
 	return sequence, nil
 }
 
-func main() {
-	// s := []alphabet.Letter{"ACTG"}
-	fpSeq := alphabet.BytesToLetters([]byte("CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"))
-	forw := linear.NewSeq("Forward Primer", fpSeq, alphabet.DNAredundant)
-	forw.RevComp()
-	fmt.Println(forw)
+func getPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliable []pep.Peptide) {
+	// count the number of N to determine the peptide length
+	pepLen := strings.Count(fmt.Sprintf("%s", template.Slice()), "N")
 
-	rpSeq := alphabet.BytesToLetters([]byte("CCGAACCTCCACC"))
-	reverse := linear.NewSeq("Reverse Primer", rpSeq, alphabet.DNAredundant)
-	fmt.Println(reverse)
-
-	varSeq := alphabet.BytesToLetters([]byte("NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"))
-	variable := linear.NewSeq("Variable", varSeq, alphabet.DNAredundant)
-	fmt.Println(variable)
-
-	sequtils.Join(variable, forw, seq.End)
-	sequtils.Join(variable, reverse, seq.Start)
-	fmt.Println(variable)
-
-	dna, err := ReadMFastQ("/home/zeh/gocode/src/github.com/jgcarvalho/PhageAnalysis/sample2.fastq")
-	if err != nil {
-		fmt.Println("ERRO", err)
-	}
-
-	sw := align.FittedAffine{
-		Matrix: [][]int{
-			{0, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50},
-			{-50, 50, -50, -50, -4, 1, -4, -1, -4, 1, -4, -1, -4, -1, -4, 0},
-			{-50, -50, 50, -50, -50, -4, 1, -1, -4, -4, 1, -1, -4, -4, -1, 0},
-			{-50, -50, -50, 50, -50, -2, -2, -1, -4, -2, -2, -1, -4, -3, -3, 0},
-			{-50, -50, -50, -50, 50, 1, 1, -1, -4, -4, -4, -4, 1, -1, -1, 0},
-			{-50, 1, -4, -2, 1, -1, -2, -1, -4, -2, -4, -3, -2, -1, -3, 0},
-			{-50, -4, 1, -2, 1, -2, -1, -1, -4, -4, -2, -3, -2, -3, -1, 0},
-			{-50, -1, -1, -1, -1, -1, -1, -1, -4, -3, -3, -2, -3, -2, -2, 0},
-			{-50, -4, -4, -4, -4, -4, -4, -4, 5, 1, 1, -1, 1, -1, -1, 0},
-			{-50, 1, -4, -2, -4, -2, -4, -3, 1, -1, -2, -1, -2, -1, -3, 0},
-			{-50, -4, 1, -2, -4, -4, -2, -3, 1, -2, -1, -1, -2, -3, -1, 0},
-			{-50, -1, -1, -1, -4, -3, -3, -2, -1, -1, -1, -1, -3, -2, -2, 0},
-			{-50, -4, -4, -4, 1, -2, -2, -3, 1, -2, -2, -3, -1, -1, -1, 0},
-			{-50, -1, -4, -3, -1, -1, -3, -2, -1, -1, -3, -2, -1, -1, -2, 0},
-			{-50, -4, -1, -3, -1, -3, -1, -2, -1, -3, -1, -2, -1, -2, -1, 0},
-			{-50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-		},
-		GapOpen: 0,
-	}
-
+	var p pep.Peptide
+	var isok bool
 	for _, v := range dna {
-		//fmt.Println(i, v)
-		aln, err := sw.Align(variable, v)
+		v.RevComp()
+		aln, err := sw.Align(template, v)
 		if err != nil {
-			fmt.Println(err)
+			panic(err)
 		}
+
 		if len(aln) == 1 {
-			fa := align.Format(variable, v, aln, '-')
-			if strings.Count(fmt.Sprint(fa[0]), "N") == 36 {
+			fa := align.Format(template, v, aln, '-')
+			if strings.Count(fmt.Sprint(fa[0]), "N") == pepLen {
 				for i, v := range fmt.Sprint(fa[0]) {
 					if v == 'N' {
-						tmp := fa[1].Slice(i, i+36)
-						fmt.Printf("%s\n", tmp)
-						fmt.Printf("%T\n", tmp)
-						Translate(tmp)
+						tmp := fa[1].Slice(i, i+pepLen)
+						p.Seq, isok = translate(tmp)
+						p.Freq = 1
+						if strings.Contains(p.Seq.String(), "*") || (!isok) {
+							unreliable = append(unreliable, p)
+						} else {
+							peptides = append(peptides, p)
+						}
+
 						break
 					}
 				}
-				fmt.Printf("%s\n", aln)
-				fmt.Printf("%s\n%s\n", fa[0], fa[1])
+
 			}
+
 		}
-		// if i > 5 {
-		// 	break
-		// }
+
+	}
+	peptides = pep.Rank(peptides)
+	return peptides, unreliable
+}
+
+func main() {
+	//tamanho do peptideo
+	pepLen := 12 * 3
+	var dna []seq.Sequence
+
+	fpSeq := alphabet.BytesToLetters([]byte("CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"))
+	forw := linear.NewSeq("Forward Primer", fpSeq, alphabet.DNAredundant)
+	// fmt.Println(forw)
+
+	rpSeq := alphabet.BytesToLetters([]byte("CCGAACCTCCACC"))
+	reverse := linear.NewSeq("Reverse Primer", rpSeq, alphabet.DNAredundant)
+	reverse.RevComp()
+	// fmt.Println(reverse)
+
+	varSeq := alphabet.BytesToLetters([]byte(strings.Repeat("N", pepLen)))
+	template := linear.NewSeq("template", varSeq, alphabet.DNAredundant)
+	// fmt.Println(template)
+
+	sequtils.Join(template, forw, seq.Start)
+	sequtils.Join(template, reverse, seq.End)
+	// fmt.Println(template)
+
+	files := []string{"./sample1.fastq", "./sample2.fastq", "./sample3.fastq", "./sample4.fastq", "./sample5.fastq"}
+	for _, f := range files {
+		tmp, err := readMFastQ(f)
+		if err != nil {
+			fmt.Println("ERRO", err)
+		}
+		dna = append(dna, tmp...)
 	}
 
+	peptides, _ := getPeptides(dna, template)
+	for _, p := range peptides {
+		fmt.Println(p)
+	}
+
+	pep.Teste(peptides)
 }
