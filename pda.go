@@ -6,10 +6,12 @@ import (
 	"strings"
 
 	"github.com/jgcarvalho/PhageAnalysis/pep"
+	"github.com/jgcarvalho/PhageAnalysis/prot"
 
 	"code.google.com/p/biogo/align"
 	"code.google.com/p/biogo/alphabet"
 	"code.google.com/p/biogo/io/seqio"
+	"code.google.com/p/biogo/io/seqio/fasta"
 	"code.google.com/p/biogo/io/seqio/fastq"
 	"code.google.com/p/biogo/seq"
 	"code.google.com/p/biogo/seq/linear"
@@ -57,7 +59,7 @@ var sw = align.FittedAffine{
 	GapOpen: 0,
 }
 
-func translate(in alphabet.Slice) (*linear.Seq, bool) {
+func translate(in alphabet.Slice) (string, bool) {
 	s := fmt.Sprintf("%s", in)
 	ok := true
 	// fmt.Println(s)
@@ -69,12 +71,13 @@ func translate(in alphabet.Slice) (*linear.Seq, bool) {
 		}
 		p += codon[s[i:i+3]]
 	}
-	pep := linear.NewSeq("pep", alphabet.BytesToLetters([]byte(p)), alphabet.Protein)
+	// pep := linear.NewSeq("pep", alphabet.BytesToLetters([]byte(p)), alphabet.Protein)
+	pep := p
 	return pep, ok
 }
 
 func readMFastQ(fn string) ([]seq.Sequence, error) {
-	fasta, err := os.Open(fn)
+	fq, err := os.Open(fn)
 	if err != nil {
 		fmt.Println("Erro ao ler o arquivo", err)
 	}
@@ -82,7 +85,7 @@ func readMFastQ(fn string) ([]seq.Sequence, error) {
 	var sequence []seq.Sequence
 	//FASTQ encoding Sanger, Illumina, Solexa...
 	t := linear.NewSeq("", s, alphabet.DNAredundant)
-	reader := fastq.NewReader(fasta, t)
+	reader := fastq.NewReader(fq, t)
 	scanner := seqio.NewScanner(reader)
 	for scanner.Next() {
 		s := scanner.Seq()
@@ -112,7 +115,8 @@ func getPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliabl
 						tmp := fa[1].Slice(i, i+pepLen)
 						p.Seq, isok = translate(tmp)
 						p.Freq = 1
-						if strings.Contains(p.Seq.String(), "*") || (!isok) {
+						// if strings.Contains(p.Seq.String(), "*") || (!isok) {
+						if strings.Contains(p.Seq, "*") || (!isok) {
 							unreliable = append(unreliable, p)
 						} else {
 							peptides = append(peptides, p)
@@ -131,11 +135,30 @@ func getPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliabl
 	return peptides, unreliable
 }
 
-func main() {
-	//tamanho do peptideo
-	pepLen := 12 * 3
-	var dna []seq.Sequence
+func readMProteins(fn string) ([]prot.Protein, error) {
+	fa, err := os.Open(fn)
+	if err != nil {
+		fmt.Println("Erro ao ler o arquivo", err)
+	}
+	var s []alphabet.Letter
+	var sequence []seq.Sequence
+	//FASTQ encoding Sanger, Illumina, Solexa...
+	t := linear.NewSeq("", s, alphabet.Protein)
+	reader := fasta.NewReader(fa, t)
+	scanner := seqio.NewScanner(reader)
+	for scanner.Next() {
+		s := scanner.Seq()
+		sequence = append(sequence, s)
+	}
+	proteins := make([]prot.Protein, len(sequence))
+	for i, s := range sequence {
+		proteins[i].Name = fmt.Sprintf("%s", s.Name())
+		proteins[i].Seq = fmt.Sprintf("%s", s.Slice())
+	}
+	return proteins, err
+}
 
+func createTemplate(pepLen int) *linear.Seq {
 	fpSeq := alphabet.BytesToLetters([]byte("CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"))
 	forw := linear.NewSeq("Forward Primer", fpSeq, alphabet.DNAredundant)
 	// fmt.Println(forw)
@@ -153,7 +176,16 @@ func main() {
 	sequtils.Join(template, reverse, seq.End)
 	// fmt.Println(template)
 
-	files := []string{"./sample1.fastq", "./sample2.fastq", "./sample3.fastq", "./sample4.fastq", "./sample5.fastq"}
+	return template
+}
+func main() {
+	//tamanho do peptideo
+	pepLen := 12 * 3
+	var dna []seq.Sequence
+
+	template := createTemplate(pepLen)
+
+	files := []string{"./sample5.fastq"}
 	for _, f := range files {
 		tmp, err := readMFastQ(f)
 		if err != nil {
@@ -163,9 +195,26 @@ func main() {
 	}
 
 	peptides, _ := getPeptides(dna, template)
-	for _, p := range peptides {
-		fmt.Println(p)
+	// for _, p := range peptides {
+	// 	fmt.Println(p)
+	// }
+
+	proteins, err := readMProteins("./proteins.faa")
+	if err != nil {
+		fmt.Println("ERRO", err)
+	}
+	// for _, v := range proteins {
+	// 	fmt.Println(v.Name)
+	// 	fmt.Println(v.Seq)
+	// }
+	// pep.Teste(peptides)
+
+	randomPeps := pep.RandomLibrary(peptides)
+	for i := 0; i < 3; i++ {
+		// fmt.Println(proteins[i].Name)
+		prot.Teste(proteins[i], peptides)
+		prot.Teste(proteins[i], randomPeps)
 	}
 
-	pep.Teste(peptides)
+	// fmt.Println(len(peptides), len(randomPeps))
 }
