@@ -2,8 +2,12 @@ package prot
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math"
 
+	"code.google.com/p/plotinum/plot"
+	"code.google.com/p/plotinum/plotter"
+	"code.google.com/p/plotinum/plotutil"
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 )
 
@@ -12,6 +16,7 @@ type Protein struct {
 	Seq         string
 	Score       []float64
 	RandomScore []float64
+	DiffScore   []float64
 	Total       float64
 	Length      int
 }
@@ -49,10 +54,11 @@ func sum(score, s []float64, freq int) {
 }
 
 func (pro *Protein) calcScore(p []pep.Peptide) []float64 {
-	score := make([]float64, len(pro.Seq))
+	pro.Length = len(pro.Seq)
+	score := make([]float64, pro.Length)
 	l := len(p[0].Seq)
 	ps := make([]float64, l)
-	for i := 0; i < len(pro.Seq)-(l-1); i++ {
+	for i := 0; i < pro.Length-(l-1); i++ {
 		for j := 0; j < len(p); j++ {
 			ps = match(pro.Seq[i:i+l], p[j].Seq)
 			sum(score[i:i+l], ps, p[j].Freq)
@@ -61,11 +67,68 @@ func (pro *Protein) calcScore(p []pep.Peptide) []float64 {
 	return score
 }
 
-func Teste(pro Protein, p []pep.Peptide) {
-	// fmt.Print(match(s1, s2))
-	score := pro.calcScore(p)
-	for i := 0; i < len(score)-1; i++ {
-		fmt.Printf("%f, ", score[i])
+func (pro *Protein) plot() {
+	p, err := plot.New()
+	if err != nil {
+		panic(err)
 	}
-	fmt.Printf("%f\n", score[len(score)-1])
+	p.Title.Text = pro.Name
+	p.X.Label.Text = "Residue"
+	p.Y.Label.Text = "Score"
+	ptsdiff := make(plotter.XYs, len(pro.Score))
+	ptsscore := make(plotter.XYs, len(pro.Score))
+	ptsrandom := make(plotter.XYs, len(pro.Score))
+	for i := 0; i < len(ptsdiff); i++ {
+		ptsdiff[i].X, ptsscore[i].X, ptsrandom[i].X = float64(i), float64(i), float64(i)
+		ptsdiff[i].Y, ptsscore[i].Y, ptsrandom[i].Y = pro.DiffScore[i], pro.Score[i], pro.RandomScore[i]
+	}
+
+	err = plotutil.AddLinePoints(p,
+		"Difference", ptsdiff,
+		"Selected", ptsscore,
+		"Random", ptsrandom)
+	if err != nil {
+		panic(err)
+	}
+	if err := p.Save(16, 8, pro.Name+".svg"); err != nil {
+		panic(err)
+	}
+}
+
+func (pro *Protein) save() {
+	out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.Total, pro.Length)
+	out += fmt.Sprintf("Score, Random Score, DiffScore\n")
+	for i := 0; i < len(pro.Score); i++ {
+		out += fmt.Sprintf("%f, %f, %f\n", pro.Score[i], pro.RandomScore[i], pro.DiffScore[i])
+	}
+	err := ioutil.WriteFile(pro.Name+".dat", []byte(out), 0644)
+	if err != nil {
+		fmt.Println("Erro ao salvar o arquivo")
+		panic(err)
+	}
+}
+
+func (pro *Protein) Analysis(peps []pep.Peptide, randpeps []pep.Peptide) {
+	// fmt.Print(match(s1, s2))
+
+	pro.Score = pro.calcScore(peps)
+	pro.RandomScore = pro.calcScore(randpeps)
+	n := len(randpeps)
+	for i := 0; i < pro.Length; i++ {
+		pro.Score[i] = pro.Score[i] / (float64(n) / 100.0)
+		pro.RandomScore[i] = pro.RandomScore[i] / (float64(n) / 100.0)
+	}
+	pro.DiffScore = make([]float64, pro.Length)
+	for i := 0; i < pro.Length; i++ {
+		pro.DiffScore[i] = pro.Score[i] - pro.RandomScore[i]
+		pro.Total += pro.DiffScore[i]
+	}
+	pro.save()
+	pro.plot()
+
+	// score := pro.calcScore(p)
+	// for i := 0; i < len(score)-1; i++ {
+	// 	fmt.Printf("%f, ", score[i])
+	// }
+	// fmt.Printf("%f\n", score[len(score)-1])
 }

@@ -1,9 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 	"github.com/jgcarvalho/PhageAnalysis/prot"
@@ -179,13 +182,22 @@ func createTemplate(pepLen int) *linear.Seq {
 	return template
 }
 func main() {
+	runtime.GOMAXPROCS(8)
+
+	pl := flag.Int("pl", 0, "peptide length")
+	var fdna, fprot, fout string
+	flag.StringVar(&fdna, "fdna", "", "FASTQ file - Peptides")
+	flag.StringVar(&fprot, "fp", "", "FASTA file - Proteins")
+	flag.StringVar(&fout, "job", "", "Job Name - Prefix to files")
+	flag.Parse()
+
 	//tamanho do peptideo
-	pepLen := 12 * 3
+	pepLen := (*pl) * 3
 	var dna []seq.Sequence
 
 	template := createTemplate(pepLen)
 
-	files := []string{"./sample5.fastq"}
+	files := []string{fdna}
 	for _, f := range files {
 		tmp, err := readMFastQ(f)
 		if err != nil {
@@ -194,12 +206,19 @@ func main() {
 		dna = append(dna, tmp...)
 	}
 
+	// Peptideos obtidos do sequenciamento. Tem que respeitar o padrao NNK e não possuir
+	// stop codons na sequencia
 	peptides, _ := getPeptides(dna, template)
 	// for _, p := range peptides {
 	// 	fmt.Println(p)
 	// }
 
-	proteins, err := readMProteins("./proteins.faa")
+	// Peptideos Randomicos com o mesmo numero da biblioteca e com a mesma proporcao de
+	// aminoacidos
+	randomPeps := pep.RandomLibrary(peptides)
+
+	// Le as proteinas
+	proteins, err := readMProteins(fprot)
 	if err != nil {
 		fmt.Println("ERRO", err)
 	}
@@ -209,11 +228,25 @@ func main() {
 	// }
 	// pep.Teste(peptides)
 
-	randomPeps := pep.RandomLibrary(peptides)
-	for i := 0; i < 3; i++ {
+	var wg1 sync.WaitGroup
+	for i := 0; i < len(proteins); i++ {
+		// for i := 0; i < 10; i++ {
 		// fmt.Println(proteins[i].Name)
-		prot.Teste(proteins[i], peptides)
-		prot.Teste(proteins[i], randomPeps)
+		wg1.Add(1)
+		// go proteins[i].Analysis(peptides, randomPeps)
+		// fmt.Println(proteins[i].Name, proteins[i].Length, proteins[i].Total)
+		// fmt.Println("WTF")
+		go func(p *prot.Protein, pep *[]pep.Peptide, rpep *[]pep.Peptide) {
+			defer wg1.Done()
+			p.Analysis(*pep, *rpep)
+			// fmt.Println(">", p.Name)
+		}(&proteins[i], &peptides, &randomPeps)
+		// prot.Teste(proteins[i], randomPeps)
+	}
+	wg1.Wait()
+	for i := 0; i < len(proteins); i++ {
+		// for i := 0; i < 10; i++ {
+		fmt.Println(proteins[i].Name, proteins[i].Length, proteins[i].Total)
 	}
 
 	// fmt.Println(len(peptides), len(randomPeps))
