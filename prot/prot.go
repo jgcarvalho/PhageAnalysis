@@ -99,9 +99,9 @@ func (pro *Protein) plot() {
 
 func (pro *Protein) save() {
 	out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.Total, pro.Length)
-	out += fmt.Sprintf("Score, Random Score, DiffScore\n")
+	out += fmt.Sprintf("NRes, Res, Score, Random Score, DiffScore\n")
 	for i := 0; i < len(pro.Score); i++ {
-		out += fmt.Sprintf("%f, %f, %f\n", pro.Score[i], pro.RandomScore[i], pro.DiffScore[i])
+		out += fmt.Sprintf("%d, %c, %f, %f, %f\n", i+1, pro.Seq[i], pro.Score[i], pro.RandomScore[i], pro.DiffScore[i])
 	}
 	err := ioutil.WriteFile(pro.Name+".dat", []byte(out), 0644)
 	if err != nil {
