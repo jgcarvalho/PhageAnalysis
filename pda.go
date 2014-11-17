@@ -208,7 +208,7 @@ func main() {
 
 	// Peptideos obtidos do sequenciamento. Tem que respeitar o padrao NNK e não possuir
 	// stop codons na sequencia
-	peptides, _ := getPeptides(dna, template)
+	peptides, unreliable := getPeptides(dna, template)
 	// for _, p := range peptides {
 	// 	fmt.Println(p)
 	// }
@@ -244,10 +244,10 @@ func main() {
 		// prot.Teste(proteins[i], randomPeps)
 	}
 	wg1.Wait()
-	for i := 0; i < len(proteins); i++ {
-		// for i := 0; i < 10; i++ {
-		fmt.Println(proteins[i].Name, proteins[i].Length, proteins[i].Total)
-	}
 
+	// fmt.Println(prot.Proteins(proteins))
+	prot.Proteins(proteins).SaveRank("rank_proteins")
+	pep.Peptides(peptides).SaveFasta("peptides.fasta")
+	pep.Peptides(unreliable).SaveFasta("peptides_unreliable.fasta")
 	// fmt.Println(len(peptides), len(randomPeps))
 }

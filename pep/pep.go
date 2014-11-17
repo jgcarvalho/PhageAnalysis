@@ -2,6 +2,7 @@ package pep
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"sort"
 )
@@ -13,9 +14,9 @@ type Peptide struct {
 	Freq int
 }
 
-type selection struct {
-	peps []Peptide
-}
+type Peptides []Peptide //{
+// 	peps []Peptide
+//}
 
 // func calcFreq(p []Peptide) {
 //     rank := make(map[string]Peptide)
@@ -34,7 +35,7 @@ type selection struct {
 
 func Rank(p []Peptide) []Peptide {
 	rank := make(map[string]Peptide)
-	var sel selection
+	var sel Peptides
 	for i, v := range p {
 		// val, exist := rank[v.Seq.String()]
 		val, exist := rank[v.Seq]
@@ -48,18 +49,18 @@ func Rank(p []Peptide) []Peptide {
 			rank[s] = p[i]
 		}
 	}
-	sel.peps = make([]Peptide, len(rank))
+	sel = make([]Peptide, len(rank))
 	i := 0
 	for k := range rank {
-		sel.peps[i] = rank[k]
+		sel[i] = rank[k]
 		i++
 	}
 	sort.Sort(sort.Reverse(sel))
-	for i := range sel.peps {
+	for i := range sel {
 		// sel.peps[i].Seq.SetName(fmt.Sprintf("pep %d [Freq: %d]", i+1, sel.peps[i].Freq))
-		sel.peps[i].Name = fmt.Sprintf("pep %d [Freq: %d]", i+1, sel.peps[i].Freq)
+		sel[i].Name = fmt.Sprintf("pep%d [Freq: %d]", i+1, sel[i].Freq)
 	}
-	return sel.peps
+	return sel
 }
 
 func aafreq(p []Peptide) (map[rune]float64, int) {
@@ -157,14 +158,26 @@ func (p Peptide) String() string {
 	return fmt.Sprintf(">%s\n%s\n", p.Name, p.Seq)
 }
 
-func (sel selection) Len() int {
-	return len(sel.peps)
+func (sel Peptides) Len() int {
+	return len(sel)
 }
 
-func (sel selection) Less(i, j int) bool {
-	return sel.peps[i].Freq < sel.peps[j].Freq
+func (sel Peptides) Less(i, j int) bool {
+	return sel[i].Freq < sel[j].Freq
 }
 
-func (sel selection) Swap(i, j int) {
-	sel.peps[i], sel.peps[j] = sel.peps[j], sel.peps[i]
+func (sel Peptides) Swap(i, j int) {
+	sel[i], sel[j] = sel[j], sel[i]
+}
+
+func (sel Peptides) SaveFasta(fn string) {
+	out := ""
+	for i := 0; i < len(sel); i++ {
+		out += sel[i].String()
+	}
+	err := ioutil.WriteFile(fn, []byte(out), 0644)
+	if err != nil {
+		fmt.Println("Erro ao salvar o arquivo")
+		panic(err)
+	}
 }

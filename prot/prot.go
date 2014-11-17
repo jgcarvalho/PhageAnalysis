@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"sort"
 
 	"code.google.com/p/plotinum/plot"
 	"code.google.com/p/plotinum/plotter"
@@ -44,6 +45,7 @@ func match(s1, s2 string) []float64 {
 	}
 	return score
 }
+
 func sum(score, s []float64, freq int) {
 	if len(score) != len(s) {
 		panic("SUM parametros com tamanho diferente")
@@ -131,4 +133,36 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps []pep.Peptide) {
 	// 	fmt.Printf("%f, ", score[i])
 	// }
 	// fmt.Printf("%f\n", score[len(score)-1])
+}
+
+func (p Proteins) Len() int {
+	return len(p)
+}
+
+func (p Proteins) Less(i, j int) bool {
+	return p[i].Total < p[j].Total
+}
+
+func (p Proteins) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+
+func (p Proteins) String() string {
+	output := fmt.Sprintf("ID\tLength\tScore\n")
+	sort.Sort(sort.Reverse(p))
+	for i := 0; i < len(p); i++ {
+		if p[i].Length > 1 {
+			output += fmt.Sprintf("%s\t%d\t%f\n", p[i].Name, p[i].Length, p[i].Total)
+		}
+	}
+	return output
+}
+
+func (p Proteins) SaveRank(fn string) {
+	out := p.String()
+	err := ioutil.WriteFile(fn, []byte(out), 0644)
+	if err != nil {
+		fmt.Println("Erro ao salvar o arquivo")
+		panic(err)
+	}
 }
