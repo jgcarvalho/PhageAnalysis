@@ -148,11 +148,11 @@ func (p Proteins) Swap(i, j int) {
 }
 
 func (p Proteins) String() string {
-	output := fmt.Sprintf("ID\tLength\tScore\n")
+	output := fmt.Sprintf("#Rank\tID\tLength\tScore\n")
 	sort.Sort(sort.Reverse(p))
 	for i := 0; i < len(p); i++ {
 		if p[i].Length > 1 {
-			output += fmt.Sprintf("%s\t%d\t%f\n", p[i].Name, p[i].Length, p[i].Total)
+			output += fmt.Sprintf("%d\t%s\t%d\t%f\n", i, p[i].Name, p[i].Length, p[i].Total)
 		}
 	}
 	return output
