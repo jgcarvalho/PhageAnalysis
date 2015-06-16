@@ -9,17 +9,23 @@ import (
 	"code.google.com/p/plotinum/plot"
 	"code.google.com/p/plotinum/plotter"
 	"code.google.com/p/plotinum/plotutil"
+	"github.com/gonum/stat"
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 )
 
 type Protein struct {
-	Name        string
-	Seq         string
-	Score       []float64
-	RandomScore []float64
-	DiffScore   []float64
-	Total       float64
-	Length      int
+	Name            string
+	Seq             string
+	Score           []float64
+	RandomScore     [][]float64
+	RandomScoreMean []float64
+	DiffScore       [][]float64
+	DiffScoreMean   []float64
+	Total           []float64
+	TotalMean       float64
+	TotalSD         float64
+	TotalError      float64
+	Length          int
 }
 
 type Proteins []Protein
@@ -82,7 +88,7 @@ func (pro *Protein) plot() {
 	ptsrandom := make(plotter.XYs, len(pro.Score))
 	for i := 0; i < len(ptsdiff); i++ {
 		ptsdiff[i].X, ptsscore[i].X, ptsrandom[i].X = float64(i), float64(i), float64(i)
-		ptsdiff[i].Y, ptsscore[i].Y, ptsrandom[i].Y = pro.DiffScore[i], pro.Score[i], pro.RandomScore[i]
+		ptsdiff[i].Y, ptsscore[i].Y, ptsrandom[i].Y = pro.DiffScoreMean[i], pro.Score[i], pro.RandomScoreMean[i]
 	}
 
 	err = plotutil.AddLinePoints(p,
@@ -110,23 +116,50 @@ func (pro *Protein) save() {
 	}
 }
 
-func (pro *Protein) Analysis(peps []pep.Peptide, randpeps []pep.Peptide) {
+func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide) {
 	// fmt.Print(match(s1, s2))
+	nlibrand := len(randpeps)
 
+	fmt.Println("Calculating score to protein: ", pro.Name)
 	pro.Score = pro.calcScore(peps)
-	pro.RandomScore = pro.calcScore(randpeps)
-	n := len(randpeps)
+
+	pro.RandomScore = make([][]float64, nlibrand)
+	pro.DiffScore = make([][]float64, nlibrand)
+	pro.Total = make([]float64, nlibrand)
+
+	for i := 0; i < nlibrand; i++ {
+		pro.RandomScore[i] = pro.calcScore(randpeps[i])
+	}
+
+	// pro.RandomScore = pro.calcScore(randpeps[0])
+	n := len(pro.RandomScore[0])
 	for i := 0; i < pro.Length; i++ {
 		pro.Score[i] = pro.Score[i] / (float64(n) / 100.0)
-		pro.RandomScore[i] = pro.RandomScore[i] / (float64(n) / 100.0)
 	}
-	pro.DiffScore = make([]float64, pro.Length)
-	for i := 0; i < pro.Length; i++ {
-		pro.DiffScore[i] = pro.Score[i] - pro.RandomScore[i]
-		pro.Total += pro.DiffScore[i]
+
+	for j := 0; j < nlibrand; j++ {
+		for i := 0; i < pro.Length; i++ {
+			pro.RandomScore[j][i] = pro.RandomScore[j][i] / (float64(n) / 100.0)
+			pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
+			pro.Total[j] += pro.DiffScore[j][i]
+		}
+		// pro.DiffScore = make([]float64, pro.Length)
+		// for i := 0; i < pro.Length; i++ {
+		// 	pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
+		// 	pro.Total[j] += pro.DiffScore[j][i]
+		// }
 	}
-	pro.save()
-	pro.plot()
+
+	pro.TotalMean, pro.TotalSD = stat.MeanStdDev(pro.Total, nil)
+	pro.TotalError = stat.StdErr(pro.TotalSD, float64(nlibrand))
+	// for i := 0; i < pro.Length; i++ {
+	// 	for j := 0; j < nlibrand; j++ {
+	//
+	// 	}
+	// }
+
+	// pro.save()
+	// pro.plot()
 
 	// score := pro.calcScore(p)
 	// for i := 0; i < len(score)-1; i++ {
@@ -140,7 +173,7 @@ func (p Proteins) Len() int {
 }
 
 func (p Proteins) Less(i, j int) bool {
-	return p[i].Total < p[j].Total
+	return p[i].TotalMean < p[j].TotalMean
 }
 
 func (p Proteins) Swap(i, j int) {
@@ -148,11 +181,11 @@ func (p Proteins) Swap(i, j int) {
 }
 
 func (p Proteins) String() string {
-	output := fmt.Sprintf("#Rank\tID\tLength\tScore\n")
+	output := fmt.Sprintf("#Rank\tID\tLength\tMeanScore\tSDScore\tErrorScore\n")
 	sort.Sort(sort.Reverse(p))
 	for i := 0; i < len(p); i++ {
 		if p[i].Length > 1 {
-			output += fmt.Sprintf("%d\t%s\t%d\t%f\n", i, p[i].Name, p[i].Length, p[i].Total)
+			output += fmt.Sprintf("%d\t%s\t%d\t%f\t%f\t%f\n", i, p[i].Name, p[i].Length, p[i].TotalMean, p[i].TotalSD, p[i].TotalError)
 		}
 	}
 	return output

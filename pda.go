@@ -1,12 +1,13 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"runtime"
 	"sync"
 
 	"code.google.com/p/biogo/seq"
+
+	"github.com/BurntSushi/toml"
 	"github.com/jgcarvalho/PhageAnalysis/pda"
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 	"github.com/jgcarvalho/PhageAnalysis/prot"
@@ -172,25 +173,56 @@ import (
 //
 // 	return template
 // }
-func main() {
-	runtime.GOMAXPROCS(8)
 
-	pl := flag.Int("pl", 0, "peptide length")
-	var fdna, fprot, fout string
-	flag.StringVar(&fdna, "fdna", "", "FASTQ file - Peptides")
-	flag.StringVar(&fprot, "fp", "", "FASTA file - Proteins")
-	flag.StringVar(&fout, "job", "", "Job Name - Prefix to files")
-	flag.Parse()
+type Config struct {
+	Title      string
+	Nproc      int
+	PepLen     int      `toml:"peptide-length"`
+	ProtFasta  string   `toml:"protein-fasta"`
+	PepFasta   []string `toml:"peptide-fasta"`
+	ForwPrimer string   `toml:"forward-primer"`
+	RevPrimer  string   `toml:"reverse-primer"`
+	Nrandom    int
+	ExpScore   float64 `toml:"exp-score"`
+	QuadWindow int     `toml:"quadrant-window"`
+}
+
+func main() {
+	var config Config
+	file := "/home/zeh/gocode/src/github.com/jgcarvalho/PhageAnalysis/config.toml"
+
+	c, err := toml.DecodeFile(file, &config)
+	if err != nil {
+		fmt.Println("Arquivo de configuração inválido!", err)
+		return
+	}
+	if len(c.Undecoded()) > 0 {
+		fmt.Printf("Chaves desconhecidas no arquivo de configuração: %q\n", c.Undecoded())
+		return
+	}
+
+	// fmt.Println(config.ForwPrimer)
+
+	runtime.GOMAXPROCS(config.Nproc)
+
+	// pl := flag.Int("pl", 0, "peptide length")
+	// var fdna, fprot, fout string
+	// flag.StringVar(&fdna, "fdna", "", "FASTQ file - Peptides")
+	// flag.StringVar(&fprot, "fp", "", "FASTA file - Proteins")
+	// flag.StringVar(&fout, "job", "", "Job Name - Prefix to files")
+	// flag.Parse()
 
 	//tamanho do peptideo
-	pepLen := (*pl) * 3
+	pepNBases := (config.PepLen) * 3
 	var dna []seq.Sequence
-	fp := "CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"
-	rp := "CCGAACCTCCACC"
-	template := pda.CreateTemplate(fp, rp, pepLen)
+	// fp := config.ForwPrimer
+	// rp := config.RevPrimer
+	fmt.Println("Creating template to translate peptides")
+	template := pda.CreateTemplate(config.ForwPrimer, config.RevPrimer, pepNBases)
 
-	files := []string{fdna}
-	for _, f := range files {
+	// files := []string{fdna}
+	fmt.Println("Reading peptides sequencing data")
+	for _, f := range config.PepFasta {
 		tmp, err := pda.ReadMFastQ(f)
 		if err != nil {
 			fmt.Println("ERRO", err)
@@ -200,20 +232,30 @@ func main() {
 
 	// Peptideos obtidos do sequenciamento. Tem que respeitar o padrao NNK e não possuir
 	// stop codons na sequencia
+	fmt.Println("Translating peptides and computing frequency")
 	peptides, unreliable := pda.GetPeptides(dna, template)
+	// fmt.Println("peptides", peptides)
 	// for _, p := range peptides {
 	// 	fmt.Println(p)
 	// }
 
 	// Peptideos Randomicos com o mesmo numero da biblioteca e com a mesma proporcao de
 	// aminoacidos
-	randomPeps := pep.RandomLibrary(peptides)
+	fmt.Println("Generating random peptides")
+	// var RandLibraries [][]pep.Peptides
+	RandLibraries := make([][]pep.Peptide, config.Nrandom)
+	for i := 0; i < config.Nrandom; i++ {
+		RandLibraries[i] = pep.RandomLibrary(peptides)
+	}
+	// randomPeps := pep.RandomLibrary(peptides)
 
 	// Le as proteinas
-	proteins, err := pda.ReadMProteins(fprot)
+	fmt.Println("Reading proteins")
+	proteins, err := pda.ReadMProteins(config.ProtFasta)
 	if err != nil {
 		fmt.Println("ERRO", err)
 	}
+
 	// for _, v := range proteins {
 	// 	fmt.Println(v.Name)
 	// 	fmt.Println(v.Seq)
@@ -228,11 +270,11 @@ func main() {
 		// go proteins[i].Analysis(peptides, randomPeps)
 		// fmt.Println(proteins[i].Name, proteins[i].Length, proteins[i].Total)
 		// fmt.Println("WTF")
-		go func(p *prot.Protein, pep *[]pep.Peptide, rpep *[]pep.Peptide) {
+		go func(p *prot.Protein, pep *[]pep.Peptide, rlibpep *[][]pep.Peptide) {
 			defer wg1.Done()
-			p.Analysis(*pep, *rpep)
+			p.Analysis(*pep, *rlibpep)
 			// fmt.Println(">", p.Name)
-		}(&proteins[i], &peptides, &randomPeps)
+		}(&proteins[i], &peptides, &RandLibraries)
 		// prot.Teste(proteins[i], randomPeps)
 	}
 	wg1.Wait()
@@ -242,4 +284,5 @@ func main() {
 	pep.Peptides(peptides).SaveFasta("peptides.fasta")
 	pep.Peptides(unreliable).SaveFasta("peptides_unreliable.fasta")
 	// fmt.Println(len(peptides), len(randomPeps))
+
 }
