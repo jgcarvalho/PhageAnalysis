@@ -1,12 +1,13 @@
 title = "TOML config example"
 
 # numero de processadores
-nproc = 4
-peptide-length = 7
+nproc = 6
+peptide-length = 12
 protein-fasta = "./Rrproteoma.fasta"
-peptide-fasta = ["./sample1.fastq", "./sample2.fastq"]
+peptide-fasta = ["./sample1.fastq"]
 forward-primer = "CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"
 reverse-primer = "CCGAACCTCCACC"
+
 # numero de bibliotecas randômicas para estimar o erro
 nrandom = 3
 # expoente da função de score

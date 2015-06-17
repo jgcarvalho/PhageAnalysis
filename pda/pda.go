@@ -8,14 +8,14 @@ import (
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 	"github.com/jgcarvalho/PhageAnalysis/prot"
 
-	"code.google.com/p/biogo/align"
-	"code.google.com/p/biogo/alphabet"
-	"code.google.com/p/biogo/io/seqio"
-	"code.google.com/p/biogo/io/seqio/fasta"
-	"code.google.com/p/biogo/io/seqio/fastq"
-	"code.google.com/p/biogo/seq"
-	"code.google.com/p/biogo/seq/linear"
-	"code.google.com/p/biogo/seq/sequtils"
+	"github.com/biogo/biogo/align"
+	"github.com/biogo/biogo/alphabet"
+	"github.com/biogo/biogo/io/seqio"
+	"github.com/biogo/biogo/io/seqio/fasta"
+	"github.com/biogo/biogo/io/seqio/fastq"
+	"github.com/biogo/biogo/seq"
+	"github.com/biogo/biogo/seq/linear"
+	"github.com/biogo/biogo/seq/sequtils"
 )
 
 var codon = map[string]string{
@@ -177,6 +177,7 @@ func CreateTemplate(fp, rp string, pepLen int) *linear.Seq {
 	// fpSeq := alphabet.BytesToLetters([]byte("CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"))
 	fpSeq := alphabet.BytesToLetters([]byte(fp))
 	forw := linear.NewSeq("Forward Primer", fpSeq, alphabet.DNAredundant)
+	// forw.RevComp()
 	// fmt.Println(forw)
 
 	// rpSeq := alphabet.BytesToLetters([]byte("CCGAACCTCCACC"))
@@ -191,6 +192,8 @@ func CreateTemplate(fp, rp string, pepLen int) *linear.Seq {
 
 	sequtils.Join(template, forw, seq.Start)
 	sequtils.Join(template, reverse, seq.End)
+	// sequtils.Join(template, reverse, seq.Start)
+	// sequtils.Join(template, forw, seq.End)
 	// fmt.Println(template)
 
 	return template

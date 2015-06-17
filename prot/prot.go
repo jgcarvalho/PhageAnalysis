@@ -14,23 +14,27 @@ import (
 )
 
 type Protein struct {
-	Name            string
-	Seq             string
-	Score           []float64
-	RandomScore     [][]float64
-	RandomScoreMean []float64
-	DiffScore       [][]float64
-	DiffScoreMean   []float64
-	Total           []float64
-	TotalMean       float64
-	TotalSD         float64
-	TotalError      float64
-	Length          int
+	Name             string
+	Seq              string
+	Score            []float64
+	RandomScore      [][]float64
+	RandomScoreMean  []float64
+	RandomScoreSD    []float64
+	RandomScoreError []float64
+	DiffScore        [][]float64
+	DiffScoreMean    []float64
+	DiffScoreSD      []float64
+	DiffScoreError   []float64
+	Total            []float64
+	TotalMean        float64
+	TotalSD          float64
+	TotalError       float64
+	Length           int
 }
 
 type Proteins []Protein
 
-func match(s1, s2 string) []float64 {
+func match(s1, s2 string, exp float64) []float64 {
 	if len(s1) != len(s2) {
 		panic("MATCH com strings de tamanho diferente")
 	}
@@ -45,7 +49,7 @@ func match(s1, s2 string) []float64 {
 	}
 	// Testar value^2 e outros expoentes
 	// value := (float64(x) - 1.0) / (float64(max) - 1.0)
-	value := math.Pow((float64(x)-1.0)/(float64(max)-1.0), 2)
+	value := math.Pow((float64(x)-1.0)/(float64(max)-1.0), exp)
 	for i := 0; i < max; i++ {
 		score[i] *= value
 	}
@@ -61,14 +65,14 @@ func sum(score, s []float64, freq int) {
 	}
 }
 
-func (pro *Protein) calcScore(p []pep.Peptide) []float64 {
+func (pro *Protein) calcScore(p []pep.Peptide, exp float64) []float64 {
 	pro.Length = len(pro.Seq)
 	score := make([]float64, pro.Length)
 	l := len(p[0].Seq)
 	ps := make([]float64, l)
 	for i := 0; i < pro.Length-(l-1); i++ {
 		for j := 0; j < len(p); j++ {
-			ps = match(pro.Seq[i:i+l], p[j].Seq)
+			ps = match(pro.Seq[i:i+l], p[j].Seq, exp)
 			sum(score[i:i+l], ps, p[j].Freq)
 		}
 	}
@@ -105,9 +109,12 @@ func (pro *Protein) plot() {
 
 func (pro *Protein) save() {
 	out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.Total, pro.Length)
-	out += fmt.Sprintf("NRes, Res, Score, Random Score, DiffScore\n")
+	out += fmt.Sprintf("NRes, Res, Score, Random Score Mean, Random Score SD, Random Score Error, " +
+		"Diff Score Mean, Diff Score SD, Diff Score Error\n")
 	for i := 0; i < len(pro.Score); i++ {
-		out += fmt.Sprintf("%d, %c, %f, %f, %f\n", i+1, pro.Seq[i], pro.Score[i], pro.RandomScore[i], pro.DiffScore[i])
+		out += fmt.Sprintf("%d, %c, %f, %f, %f, %f, %f, %f, %f\n", i+1, pro.Seq[i], pro.Score[i],
+			pro.RandomScoreMean[i], pro.RandomScoreSD[i], pro.RandomScoreError[i],
+			pro.DiffScoreMean[i], pro.DiffScoreSD[i], pro.DiffScoreError[i])
 	}
 	err := ioutil.WriteFile(pro.Name+".dat", []byte(out), 0644)
 	if err != nil {
@@ -116,30 +123,40 @@ func (pro *Protein) save() {
 	}
 }
 
-func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide) {
+func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp float64) {
 	// fmt.Print(match(s1, s2))
 	nlibrand := len(randpeps)
 
 	fmt.Println("Calculating score to protein: ", pro.Name)
-	pro.Score = pro.calcScore(peps)
+	pro.Score = pro.calcScore(peps, exp)
 
 	pro.RandomScore = make([][]float64, nlibrand)
 	pro.DiffScore = make([][]float64, nlibrand)
+
+	pro.RandomScoreMean = make([]float64, pro.Length)
+	pro.RandomScoreSD = make([]float64, pro.Length)
+	pro.RandomScoreError = make([]float64, pro.Length)
+	pro.DiffScoreMean = make([]float64, pro.Length)
+	pro.DiffScoreSD = make([]float64, pro.Length)
+	pro.DiffScoreError = make([]float64, pro.Length)
+
 	pro.Total = make([]float64, nlibrand)
 
 	for i := 0; i < nlibrand; i++ {
-		pro.RandomScore[i] = pro.calcScore(randpeps[i])
+		pro.RandomScore[i] = pro.calcScore(randpeps[i], exp)
 	}
 
 	// pro.RandomScore = pro.calcScore(randpeps[0])
-	n := len(pro.RandomScore[0])
+	// n := pro.Length
 	for i := 0; i < pro.Length; i++ {
-		pro.Score[i] = pro.Score[i] / (float64(n) / 100.0)
+		// pro.Score[i] = pro.Score[i] / (float64(n) / 100.0)
+		pro.Score[i] = pro.Score[i] / 1000.0
 	}
-
 	for j := 0; j < nlibrand; j++ {
+		pro.DiffScore[j] = make([]float64, pro.Length)
 		for i := 0; i < pro.Length; i++ {
-			pro.RandomScore[j][i] = pro.RandomScore[j][i] / (float64(n) / 100.0)
+			// pro.RandomScore[j][i] = pro.RandomScore[j][i] / (float64(n) / 100.0)
+			pro.RandomScore[j][i] = pro.RandomScore[j][i] / 1000.0
 			pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
 			pro.Total[j] += pro.DiffScore[j][i]
 		}
@@ -148,17 +165,27 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide) {
 		// 	pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
 		// 	pro.Total[j] += pro.DiffScore[j][i]
 		// }
+		fmt.Printf("Total %d = %.3f\n", j, pro.Total[j])
 	}
 
 	pro.TotalMean, pro.TotalSD = stat.MeanStdDev(pro.Total, nil)
 	pro.TotalError = stat.StdErr(pro.TotalSD, float64(nlibrand))
-	// for i := 0; i < pro.Length; i++ {
-	// 	for j := 0; j < nlibrand; j++ {
-	//
-	// 	}
-	// }
+	fmt.Println("Done")
 
-	// pro.save()
+	diff := make([]float64, nlibrand)
+	randscore := make([]float64, nlibrand)
+	for i := 0; i < pro.Length; i++ {
+		for j := 0; j < nlibrand; j++ {
+			diff[j] = pro.DiffScore[j][i]
+			pro.DiffScoreMean[i], pro.DiffScoreSD[i] = stat.MeanStdDev(diff, nil)
+			pro.DiffScoreError[i] = stat.StdErr(pro.DiffScoreSD[i], float64(nlibrand))
+			randscore[j] = pro.RandomScore[j][i]
+			pro.RandomScoreMean[i], pro.RandomScoreSD[i] = stat.MeanStdDev(randscore, nil)
+			pro.RandomScoreError[i] = stat.StdErr(pro.RandomScoreSD[i], float64(nlibrand))
+		}
+	}
+
+	pro.save()
 	// pro.plot()
 
 	// score := pro.calcScore(p)
