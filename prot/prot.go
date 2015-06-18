@@ -149,14 +149,14 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp f
 	// pro.RandomScore = pro.calcScore(randpeps[0])
 	// n := pro.Length
 	for i := 0; i < pro.Length; i++ {
-		// pro.Score[i] = pro.Score[i] / (float64(n) / 100.0)
-		pro.Score[i] = pro.Score[i] / 1000.0
+		// pro.Score[i] = pro.Score[i] / 1000.0
+		pro.Score[i] = pro.Score[i] / float64(len(randpeps[0])/10)
 	}
 	for j := 0; j < nlibrand; j++ {
 		pro.DiffScore[j] = make([]float64, pro.Length)
 		for i := 0; i < pro.Length; i++ {
-			// pro.RandomScore[j][i] = pro.RandomScore[j][i] / (float64(n) / 100.0)
-			pro.RandomScore[j][i] = pro.RandomScore[j][i] / 1000.0
+			// pro.RandomScore[j][i] = pro.RandomScore[j][i] / 1000.0
+			pro.RandomScore[j][i] = pro.RandomScore[j][i] / float64(len(randpeps[0])/10)
 			pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
 			pro.Total[j] += pro.DiffScore[j][i]
 		}
@@ -208,7 +208,7 @@ func (p Proteins) Swap(i, j int) {
 }
 
 func (p Proteins) String() string {
-	output := fmt.Sprintf("#Rank\tID\tLength\tMeanScore\tSDScore\tErrorScore\n")
+	output := fmt.Sprintf("#Rank\tID\tLength\tTotalMeanScore\tTotalSDScore\tTotalErrorScore\n")
 	sort.Sort(sort.Reverse(p))
 	for i := 0; i < len(p); i++ {
 		if p[i].Length > 1 {
