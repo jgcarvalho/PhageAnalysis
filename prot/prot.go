@@ -13,6 +13,42 @@ import (
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 )
 
+// Dixon Q test table (David B. Rorabacher Anal. Chem., 1991, 63 (2), 139-146• DOI: 10.1021/ac00002a010 )
+// 3 0.886 0.941 0.970 0.976 0.988 0.994
+// 4 0.679 0.765 0.829 0.846 0.889 0.926
+// 5 0.557 0.642 0.7 10 0.729 0.780 0.821
+// 6 0.482 0.560 0.625 0.644 0.698 0.740
+// 7 0.434 0.507 0.568 0.586 0.637 0.680
+// 8 0.399 0.468 0.526 0.543 0.590 0.634
+// 9 0.370 0.437 0.493 0.510 0.555 0.598
+// 10 0.349 0.412 0.466 0.483 0.527 0.568
+// 11 0.332 0.392 0.444 0.460 0.502 0.542
+// 12 0.318 0.376 0.426 0.441 0.482 0.522
+// 13 0.305 0.361 0.410 0.425 0.465 0.503
+// 14 0.294 0.349 0.396 0.411 0.450 0.488
+// 15 0.285 0.338 0.384 0.399 0.438 0.475
+// 16 0.277 0.329 0.374 0.388 0.426 0.463
+// 17 0.269 0.320 0.365 0.379 0.416 0.452
+// 18 0.263 0.313 0.356 0.370 0.407 0.442
+// 19 0.258 0.306 0.349 0.363 0.398 0.433
+// 20 0.252 0.300 0.342 0.356 0.391 0.425
+// 21 0.247 0.295 0.337 0.350 0.384 0.418
+// 22 0.242 0.290 0.331 0.344 0.378 0.411
+// 23 0.238 0.285 0.326 0.338 0.372 0.404
+// 24 0.234 0.281 0.321 0.333 0.367 0.399
+// 25 0.230 0.277 0.3 17 0.329 0.362 0.393
+// 26 0.227 0.273 0.312 0.324 0.357 0.388
+// 27 0.224 0.269 0.308 0.320 0.353 0.384
+// 28 0.220 0.266 0.305 0.316 0.349 0.380
+// 29 0.218 0.263 0.301 0.312 0.345 0.376
+// 30 0.215 0.260 0.298 0.309 0.341 0.372
+var q99 = [28]float64{0.994, 0.926, 0.821, 0.740, 0.680, 0.634, 0.598, 0.568, 0.542, 0.522, 0.503, 0.488, 0.475, 0.463, 0.452, 0.442, 0.433, 0.425, 0.418, 0.411, 0.404, 0.399, 0.393, 0.388, 0.384, 0.380, 0.376, 0.372}
+var q98 = [28]float64{0.988, 0.889, 0.780, 0.698, 0.637, 0.590, 0.555, 0.527, 0.502, 0.482, 0.465, 0.450, 0.438, 0.426, 0.416, 0.407, 0.398, 0.391, 0.384, 0.378, 0.372, 0.367, 0.362, 0.357, 0.353, 0.349, 0.345, 0.341}
+var q96 = [28]float64{0.976, 0.846, 0.729, 0.644, 0.586, 0.543, 0.510, 0.483, 0.460, 0.441, 0.425, 0.411, 0.399, 0.388, 0.379, 0.370, 0.363, 0.356, 0.350, 0.344, 0.338, 0.333, 0.329, 0.324, 0.320, 0.316, 0.312, 0.309}
+var q95 = [28]float64{0.970, 0.829, 0.710, 0.625, 0.568, 0.526, 0.493, 0.466, 0.444, 0.426, 0.410, 0.396, 0.384, 0.374, 0.365, 0.356, 0.349, 0.342, 0.337, 0.331, 0.326, 0.321, 0.317, 0.312, 0.308, 0.305, 0.301, 0.298}
+var q90 = [28]float64{0.941, 0.765, 0.642, 0.560, 0.507, 0.468, 0.437, 0.412, 0.392, 0.376, 0.361, 0.349, 0.338, 0.329, 0.320, 0.313, 0.306, 0.300, 0.295, 0.290, 0.285, 0.281, 0.277, 0.273, 0.269, 0.266, 0.263, 0.260}
+var q80 = [28]float64{0.886, 0.679, 0.557, 0.482, 0.434, 0.399, 0.370, 0.349, 0.332, 0.318, 0.305, 0.294, 0.285, 0.277, 0.269, 0.263, 0.258, 0.252, 0.247, 0.242, 0.238, 0.234, 0.230, 0.227, 0.224, 0.220, 0.218, 0.215}
+
 type Protein struct {
 	Name             string
 	Seq              string
@@ -25,11 +61,14 @@ type Protein struct {
 	DiffScoreMean    []float64
 	DiffScoreSD      []float64
 	DiffScoreError   []float64
-	Total            []float64
-	TotalMean        float64
-	TotalSD          float64
-	TotalError       float64
-	Length           int
+	Qvalue           []float64
+	// Total            []float64
+	// TotalMean        float64
+	// TotalSD          float64
+	// TotalError       float64
+	TotalScore     float64
+	TotalDiffScore float64
+	Length         int
 }
 
 type Proteins []Protein
@@ -108,13 +147,14 @@ func (pro *Protein) plot() {
 }
 
 func (pro *Protein) save() {
-	out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.Total, pro.Length)
+	// out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.Total, pro.Length)
+	out := fmt.Sprintf("%s Score Total: %f Length: %d\n\n", pro.Name, pro.TotalScore, pro.Length)
 	out += fmt.Sprintf("NRes, Res, Score, Random Score Mean, Random Score SD, Random Score Error, " +
-		"Diff Score Mean, Diff Score SD, Diff Score Error\n")
+		"Diff Score Mean, Diff Score SD, Diff Score Error, Q-Value\n")
 	for i := 0; i < len(pro.Score); i++ {
-		out += fmt.Sprintf("%d, %c, %f, %f, %f, %f, %f, %f, %f\n", i+1, pro.Seq[i], pro.Score[i],
+		out += fmt.Sprintf("%d, %c, %f, %f, %f, %f, %f, %f, %f, %f\n", i+1, pro.Seq[i], pro.Score[i],
 			pro.RandomScoreMean[i], pro.RandomScoreSD[i], pro.RandomScoreError[i],
-			pro.DiffScoreMean[i], pro.DiffScoreSD[i], pro.DiffScoreError[i])
+			pro.DiffScoreMean[i], pro.DiffScoreSD[i], pro.DiffScoreError[i], pro.Qvalue[i])
 	}
 	err := ioutil.WriteFile(pro.Name+".dat", []byte(out), 0644)
 	if err != nil {
@@ -139,8 +179,9 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp f
 	pro.DiffScoreMean = make([]float64, pro.Length)
 	pro.DiffScoreSD = make([]float64, pro.Length)
 	pro.DiffScoreError = make([]float64, pro.Length)
+	pro.Qvalue = make([]float64, pro.Length)
 
-	pro.Total = make([]float64, nlibrand)
+	// pro.Total = make([]float64, nlibrand)
 
 	for i := 0; i < nlibrand; i++ {
 		pro.RandomScore[i] = pro.calcScore(randpeps[i], exp)
@@ -158,23 +199,24 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp f
 			// pro.RandomScore[j][i] = pro.RandomScore[j][i] / 1000.0
 			pro.RandomScore[j][i] = pro.RandomScore[j][i] / float64(len(randpeps[0])/10)
 			pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
-			pro.Total[j] += pro.DiffScore[j][i]
+			// pro.Total[j] += pro.DiffScore[j][i]
 		}
 		// pro.DiffScore = make([]float64, pro.Length)
 		// for i := 0; i < pro.Length; i++ {
 		// 	pro.DiffScore[j][i] = pro.Score[i] - pro.RandomScore[j][i]
 		// 	pro.Total[j] += pro.DiffScore[j][i]
 		// }
-		fmt.Printf("Total %d = %.3f\n", j, pro.Total[j])
+		// fmt.Printf("Protein: %s Total %d = %.3f\n", pro.Name, j, pro.Total[j])
 	}
 
-	pro.TotalMean, pro.TotalSD = stat.MeanStdDev(pro.Total, nil)
-	pro.TotalError = stat.StdErr(pro.TotalSD, float64(nlibrand))
+	// pro.TotalMean, pro.TotalSD = stat.MeanStdDev(pro.Total, nil)
+	// pro.TotalError = stat.StdErr(pro.TotalSD, float64(nlibrand))
 	fmt.Println("Done")
 
 	diff := make([]float64, nlibrand)
 	randscore := make([]float64, nlibrand)
 	for i := 0; i < pro.Length; i++ {
+		max, min := 0.0, 0.0
 		for j := 0; j < nlibrand; j++ {
 			diff[j] = pro.DiffScore[j][i]
 			pro.DiffScoreMean[i], pro.DiffScoreSD[i] = stat.MeanStdDev(diff, nil)
@@ -182,8 +224,23 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp f
 			randscore[j] = pro.RandomScore[j][i]
 			pro.RandomScoreMean[i], pro.RandomScoreSD[i] = stat.MeanStdDev(randscore, nil)
 			pro.RandomScoreError[i] = stat.StdErr(pro.RandomScoreSD[i], float64(nlibrand))
+			sort.Float64s(randscore)
+			// fmt.Println("random", randscore)
+			min, max = randscore[0], randscore[len(randscore)-1]
 		}
+		if pro.Score[i] < max {
+			pro.Qvalue[i] = 0.0
+		} else {
+			pro.Qvalue[i] = (pro.Score[i] - max) / (pro.Score[i] - min)
+		}
+		if pro.Qvalue[i] > q99[nlibrand-2] {
+			pro.TotalScore += pro.Score[i]
+			pro.TotalDiffScore += pro.DiffScoreMean[i]
+		}
+		// fmt.Printf("Qvalue min %f, max %f, score %f, value %f\n", min, max, pro.Score[i], pro.Qvalue[i])
+
 	}
+	fmt.Printf("Protein: %s, Score: %f, Diff: %f\n", pro.Name, pro.TotalScore, pro.TotalDiffScore)
 
 	pro.save()
 	// pro.plot()
@@ -200,7 +257,8 @@ func (p Proteins) Len() int {
 }
 
 func (p Proteins) Less(i, j int) bool {
-	return p[i].TotalMean < p[j].TotalMean
+	// return p[i].TotalMean < p[j].TotalMean
+	return p[i].TotalScore < p[j].TotalScore
 }
 
 func (p Proteins) Swap(i, j int) {
@@ -208,11 +266,15 @@ func (p Proteins) Swap(i, j int) {
 }
 
 func (p Proteins) String() string {
-	output := fmt.Sprintf("#Rank\tID\tLength\tTotalMeanScore\tTotalSDScore\tTotalErrorScore\n")
+	// output := fmt.Sprintf("#Rank\tID\tLength\tTotalMeanScore\tTotalSDScore\tTotalErrorScore\n")
+	output := fmt.Sprintf("#Rank\tID\tLength\tTotalScore\tTotalDiffScore\n")
+
 	sort.Sort(sort.Reverse(p))
 	for i := 0; i < len(p); i++ {
 		if p[i].Length > 1 {
-			output += fmt.Sprintf("%d\t%s\t%d\t%f\t%f\t%f\n", i, p[i].Name, p[i].Length, p[i].TotalMean, p[i].TotalSD, p[i].TotalError)
+			// output += fmt.Sprintf("%d\t%s\t%d\t%f\t%f\t%f\n", i, p[i].Name, p[i].Length, p[i].TotalMean, p[i].Qvalue, p[i].TotalError)
+			output += fmt.Sprintf("%d\t%s\t%d\t%f\t%f\n", i, p[i].Name, p[i].Length, p[i].TotalScore, p[i].TotalDiffScore)
+
 		}
 	}
 	return output
