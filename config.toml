@@ -9,7 +9,7 @@ forward-primer = "CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"
 reverse-primer = "CCGAACCTCCACC"
 
 # numero de bibliotecas randômicas para estimar o erro
-nrandom = 3
+nrandom = 5
 # expoente da função de score
 exp-score = 2.0
 # janela da análise quadrant
