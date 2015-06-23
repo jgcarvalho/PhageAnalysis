@@ -233,7 +233,8 @@ func (pro *Protein) Analysis(peps []pep.Peptide, randpeps [][]pep.Peptide, exp f
 		} else {
 			pro.Qvalue[i] = (pro.Score[i] - max) / (pro.Score[i] - min)
 		}
-		if pro.Qvalue[i] > q99[nlibrand-3] {
+		// ex Q-test N=4 (nlibrand = 3, libpep = 1) nlibrand+(1-3)=q99(1)
+		if pro.Qvalue[i] > q99[nlibrand-2] {
 			pro.TotalScore += pro.Score[i]
 			pro.TotalDiffScore += pro.DiffScoreMean[i]
 		}
@@ -258,7 +259,7 @@ func (p Proteins) Len() int {
 
 func (p Proteins) Less(i, j int) bool {
 	// return p[i].TotalMean < p[j].TotalMean
-	return p[i].TotalScore < p[j].TotalScore
+	return p[i].TotalDiffScore < p[j].TotalDiffScore
 }
 
 func (p Proteins) Swap(i, j int) {

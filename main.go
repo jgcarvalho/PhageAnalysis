@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"runtime"
 	"sync"
@@ -191,9 +192,9 @@ func main() {
 	showCredits()
 	var config Config
 	var cf string
-	cf = "/home/jgcarvalho/gocode/src/github.com/jgcarvalho/PhageAnalysis/config.toml"
-	// flag.StringVar(&cf, "c", "", "Configuration file (TOML format)")
-	// flag.Parse()
+	// cf = "/home/jgcarvalho/gocode/src/github.com/jgcarvalho/PhageAnalysis/config.toml"
+	flag.StringVar(&cf, "c", "", "Configuration file (TOML format)")
+	flag.Parse()
 
 	c, err := toml.DecodeFile(cf, &config)
 	if err != nil {
