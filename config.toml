@@ -2,9 +2,14 @@ title = "TOML config example"
 
 # numero de processadores
 nproc = 6
-peptide-length = 12
+# protein sequence
 protein-fasta = "./Rrproteoma.fasta"
-peptide-fasta = ["./sample1.fastq"]
+# translate peptides from dna sequence
+translate = true
+peptide-length = 12
+# dna or amino acid sequence
+peptide-fasta = "./sample1.fastq"
+# primers
 forward-primer = "CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"
 reverse-primer = "CCGAACCTCCACC"
 

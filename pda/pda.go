@@ -3,6 +3,7 @@ package pda
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/jgcarvalho/PhageAnalysis/pep"
@@ -148,6 +149,36 @@ func GetPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliabl
 	}
 	peptides = pep.Rank(peptides)
 	return peptides, unreliable
+}
+
+func ReadTranslatedPeptides(fn string, penLen int) ([]pep.Peptide, error) {
+	fa, err := os.Open(fn)
+	if err != nil {
+		fmt.Println("Erro ao ler o arquivo", err)
+	}
+	var s []alphabet.Letter
+	var sequence []seq.Sequence
+	//FASTQ encoding Sanger, Illumina, Solexa...
+	t := linear.NewSeq("", s, alphabet.Protein)
+	reader := fasta.NewReader(fa, t)
+	scanner := seqio.NewScanner(reader)
+	for scanner.Next() {
+		s := scanner.Seq()
+		sequence = append(sequence, s)
+	}
+	peptides := make([]pep.Peptide, len(sequence))
+	for i, s := range sequence {
+		// fmt.Println(s.Description())
+		freq, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(s.Description(), "[Freq: "), "]"))
+		if err != nil {
+			fmt.Println("Erro ao ler a frequencia do peptideo", err)
+			return nil, err
+		}
+		peptides[i].Name = s.Name()
+		peptides[i].Freq = freq
+		peptides[i].Seq = fmt.Sprintf("%s", s.Slice())
+	}
+	return peptides, err
 }
 
 func ReadMProteins(fn string) ([]prot.Protein, error) {
