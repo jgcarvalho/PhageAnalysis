@@ -1,0 +1,21 @@
+title = "TOML config example"
+
+# numero de processadores
+nproc = 6
+# protein sequence
+protein-fasta = "./Rrproteoma.fasta"
+# translate peptides from dna sequence
+translate = false
+peptide-length = 10
+# dna or amino acid sequence
+peptide-fasta = "./uPA_LibraryB.fasta"
+# primers
+forward-primer = ""
+reverse-primer = ""
+
+# numero de bibliotecas randômicas para estimar o erro
+nrandom = 3
+# expoente da função de score
+exp-score = 2.0
+# janela da análise quadrant
+quadrant-window = 7
