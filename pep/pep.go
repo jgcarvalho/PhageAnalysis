@@ -14,24 +14,7 @@ type Peptide struct {
 	Freq int
 }
 
-type Peptides []Peptide //{
-// 	peps []Peptide
-//}
-
-// func calcFreq(p []Peptide) {
-//     rank := make(map[string]Peptide)
-//     for i, v := range p {
-//         val, exist := rank[v.Seq.String()]
-//         if exist {
-//             val.Freq += 1
-//             rank[v.Seq.String()] = val
-//         } else {
-//             s := v.Seq.String()
-//             rank[s] = p[i]
-//         }
-//     }
-//     // for i, v := range
-// }
+type Peptides []Peptide
 
 func Rank(p []Peptide) []Peptide {
 	rank := make(map[string]Peptide)

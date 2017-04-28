@@ -1,9 +1,8 @@
-title = "TOML config example"
+title = "Translate peptides from sequence"
 
-# numero de processadores
+# number of processors
 nproc = 6
-# protein sequence
-protein-fasta = "./Rrproteoma.fasta"
+
 # translate peptides from dna sequence
 translate = true
 peptide-length = 12
@@ -13,9 +12,12 @@ peptide-fasta = "./sample1.fastq"
 forward-primer = "CCTCTCTATGGGCAGTCGGTGATCCTTTCTATTCTCACTCT"
 reverse-primer = "CCGAACCTCCACC"
 
-# numero de bibliotecas randômicas para estimar o erro
+# map hits in protein sequences
+mapping = false
+# protein sequences
+protein-fasta = "./Rrproteoma.fasta"
+# number of random sequences to estimate error
 nrandom = 3
-# expoente da função de score
+# score function exponent
 exp-score = 2.0
-# janela da análise quadrant
 quadrant-window = 7
