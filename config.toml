@@ -6,6 +6,7 @@ nproc = 6
 # translate peptides from dna sequence
 translate = true
 peptide-length = 12
+translated-strand = true
 # dna or amino acid sequence
 peptide-fasta = "./sample1.fastq"
 # primers

@@ -7,6 +7,8 @@ import (
 
 	"github.com/biogo/biogo/seq"
 
+	"strings"
+
 	"github.com/BurntSushi/toml"
 	"github.com/jgcarvalho/PhageAnalysis/pda"
 	"github.com/jgcarvalho/PhageAnalysis/pep"
@@ -14,15 +16,17 @@ import (
 )
 
 type Config struct {
-	Title      string
-	Translate  bool   `toml:"translate"`
-	Mapping    bool   `toml:"mapping"`
-	Nproc      int    `toml:"nproc"`
-	PepLen     int    `toml:"peptide-length"`
-	ProtFasta  string `toml:"protein-fasta"`
-	PepFasta   string `toml:"peptide-fasta"`
-	ForwPrimer string `toml:"forward-primer"`
-	RevPrimer  string `toml:"reverse-primer"`
+	Title            string
+	Translate        bool   `toml:"translate"`
+	Mapping          bool   `toml:"mapping"`
+	Nproc            int    `toml:"nproc"`
+	ReadLen          int    `toml:"read-length"`
+	PepLen           int    `toml:"peptide-length"`
+	TranslatedStrand bool   `toml:"translated-strand"`
+	ProtFasta        string `toml:"protein-fasta"`
+	PepFasta         string `toml:"peptide-fasta"`
+	ForwPrimer       string `toml:"forward-primer"`
+	RevPrimer        string `toml:"reverse-primer"`
 
 	Nrandom    int
 	ExpScore   float64 `toml:"exp-score"`
@@ -71,9 +75,9 @@ func main() {
 		// Peptideos obtidos do sequenciamento. Tem que respeitar o padrao NNK e não possuir
 		// stop codons na sequencia
 		fmt.Println("Translating peptides and computing frequency")
-		peptides, unreliable = pda.GetPeptides(dna, template)
-		pep.Peptides(peptides).SaveFasta("peptides.fasta")
-		pep.Peptides(unreliable).SaveFasta("peptides_unreliable.fasta")
+		peptides, unreliable = pda.GetPeptides(dna, template, config.TranslatedStrand, config.ReadLen)
+		pep.Peptides(peptides).SaveFasta(strings.Replace(config.PepFasta, ".fastq", "_translated_peptides.fasta", 1))
+		pep.Peptides(unreliable).SaveFasta(strings.Replace(config.PepFasta, ".fastq", "_translated_peptides_unreliable.fasta", 1))
 
 	} else {
 		peptides, err = pda.ReadTranslatedPeptides(config.PepFasta, config.PepLen)

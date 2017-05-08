@@ -9,7 +9,6 @@ import (
 	"github.com/jgcarvalho/PhageAnalysis/pep"
 	"github.com/jgcarvalho/PhageAnalysis/prot"
 
-	"github.com/biogo/biogo/align"
 	"github.com/biogo/biogo/alphabet"
 	"github.com/biogo/biogo/io/seqio"
 	"github.com/biogo/biogo/io/seqio/fasta"
@@ -38,6 +37,7 @@ var codon = map[string]string{
 	"GGA": "G", "GGT": "G", "GGC": "G", "GGG": "G",
 }
 
+/*
 var sw = align.FittedAffine{
 	Matrix: [][]int{
 		{0, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50, -50},
@@ -58,9 +58,9 @@ var sw = align.FittedAffine{
 		{-50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	},
 	GapOpen: 0,
-}
+}*/
 
-func Translate(in alphabet.Slice) (string, bool) {
+/*func Translate(in alphabet.Slice) (string, bool) {
 	s := fmt.Sprintf("%s", in)
 	ok := true
 	// fmt.Println(s)
@@ -75,6 +75,26 @@ func Translate(in alphabet.Slice) (string, bool) {
 	// pep := linear.NewSeq("pep", alphabet.BytesToLetters([]byte(p)), alphabet.Protein)
 	pep := p
 	return pep, ok
+}*/
+
+func reverse(s string) string {
+	runes := []rune(s)
+	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
+		runes[i], runes[j] = runes[j], runes[i]
+	}
+	return string(runes)
+}
+
+func translate(dna string) string {
+	var p string
+	for i := 0; i < len(dna); i += 3 {
+		/*		if dna[i+2] != 'T' && dna[i+2] != 'G' {
+				fmt.Println("not NNK")
+			}*/
+		p += codon[dna[i:i+3]]
+	}
+
+	return p
 }
 
 func ReadMFastQ(fn string) ([]seq.Sequence, error) {
@@ -95,7 +115,7 @@ func ReadMFastQ(fn string) ([]seq.Sequence, error) {
 	return sequence, nil
 }
 
-//Pode substituir parte da função acima
+/*//Pode substituir parte da função acima
 func ReadMDna(fq *os.File) ([]seq.Sequence, error) {
 	var s []alphabet.Letter
 	var sequence []seq.Sequence
@@ -107,10 +127,107 @@ func ReadMDna(fq *os.File) ([]seq.Sequence, error) {
 		s := scanner.Seq()
 		sequence = append(sequence, s)
 	}
+	fmt.Println(sequence)
 	return sequence, nil
+}*/
+
+func getpep(dna, template string) (string, bool, int) {
+	score := 0
+	template = strings.Repeat("#", len(dna)) + template + strings.Repeat("#", len(dna))
+	pepLen := strings.Count(template, "X")
+	firstN := strings.Index(template, "X")
+	lastN := strings.LastIndex(template, "X")
+	maxscore := len(dna) - pepLen
+
+	bestScore := maxscore
+	bestPep := ""
+
+	var valid bool
+	var pep []byte
+
+	//fmt.Println("Max Score", maxscore)
+	for j := lastN + 1 - len(dna); j < firstN; j++ {
+		score = maxscore
+		pep = []byte{}
+		for i, v := range dna {
+			if byte(v) == template[i+j] {
+				score -= 1
+			}
+			if template[i+j] == 'X' {
+				pep = append(pep, byte(v))
+			}
+		}
+		if score < bestScore {
+			bestScore = score
+			bestPep = string(pep)
+		}
+		//fmt.Println(j, score)
+	}
+
+	bestPep = translate(bestPep)
+	if bestScore > 1 || strings.Contains(bestPep, "*") {
+		valid = false
+	} else {
+		valid = true
+	}
+
+	if pepLen/3 != len(bestPep) {
+		fmt.Println("incorrect peptide")
+		fmt.Println(dna)
+		valid = false
+	}
+	return bestPep, valid, bestScore
 }
 
-func GetPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliable []pep.Peptide) {
+func GetPeptides(dna []seq.Sequence, template seq.Sequence, translatedStrand bool, readLen int) (peptides, unreliable []pep.Peptide) {
+	// count the number of N to determine the peptide length
+	//pepLen := strings.Count(fmt.Sprintf("%s", template.Slice()), "X")
+
+	// fmt.Println("New function")
+	// fmt.Println("count X", pepLen)
+	//template.RevComp()
+	templateSeq := fmt.Sprintf("%s", template.Slice())
+	/*	dnaSeq := fmt.Sprintf("%s", dna[0].Slice())
+		maxScore := len(dnaSeq) - pepLen
+		fmt.Println(templateSeq)
+		fmt.Println(dnaSeq)
+		fmt.Println(maxScore)
+		pep, valid, score := getpep(dnaSeq, templateSeq)
+		fmt.Println(pep, valid, score)*/
+
+	var p pep.Peptide
+	//var pepSeq string
+	var valid bool
+	var score int
+	var dnaSeq string
+
+	for _, v := range dna {
+		if !translatedStrand {
+			v.RevComp()
+		}
+		dnaSeq = fmt.Sprintf("%s", v.Slice())
+		if len(dnaSeq) > readLen {
+			fmt.Println("skip read: length > ", readLen)
+			continue
+		}
+		if strings.Contains(dnaSeq, "N") {
+			fmt.Println("skip read: undefined base N")
+			continue
+		}
+		p.Seq, valid, score = getpep(dnaSeq, templateSeq)
+		p.Freq = 1
+		fmt.Println(p.Seq, valid, score)
+		if valid {
+			peptides = append(peptides, p)
+		} else {
+			unreliable = append(unreliable, p)
+		}
+	}
+	peptides = pep.Rank(peptides)
+	return
+}
+
+/*func GetPeptidesOld(dna []seq.Sequence, template seq.Sequence) (peptides, unreliable []pep.Peptide) {
 	// count the number of N to determine the peptide length
 	pepLen := strings.Count(fmt.Sprintf("%s", template.Slice()), "N")
 
@@ -122,6 +239,7 @@ func GetPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliabl
 		if err != nil {
 			panic(err)
 		}
+		fmt.Println(aln)
 
 		if len(aln) == 1 {
 			fa := align.Format(template, v, aln, '-')
@@ -143,13 +261,15 @@ func GetPeptides(dna []seq.Sequence, template seq.Sequence) (peptides, unreliabl
 				}
 
 			}
-
+		} else {
+			fmt.Println("problema alinhament")
+			fmt.Println(len(aln))
 		}
 
 	}
 	peptides = pep.Rank(peptides)
 	return peptides, unreliable
-}
+}*/
 
 func ReadTranslatedPeptides(fn string, penLen int) ([]pep.Peptide, error) {
 	fa, err := os.Open(fn)
@@ -217,7 +337,7 @@ func CreateTemplate(fp, rp string, pepLen int) *linear.Seq {
 	reverse.RevComp()
 	// fmt.Println(reverse)
 
-	varSeq := alphabet.BytesToLetters([]byte(strings.Repeat("N", pepLen)))
+	varSeq := alphabet.BytesToLetters([]byte(strings.Repeat("X", pepLen)))
 	template := linear.NewSeq("template", varSeq, alphabet.DNAredundant)
 	// fmt.Println(template)
 
